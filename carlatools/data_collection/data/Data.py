@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from PIL import Image
+import cv2
+from numpy.lib.npyio import save
 
 class Data(ABC):
     def __init__(self, data):
@@ -13,7 +14,7 @@ class Data(ABC):
         return self.data
 
 class Image(Data):
-    def __init__(self, data, sensor_names, ext="png"):
+    def __init__(self, data, sensor_name, ext="png"):
         """
         Data type for camera data from CARLA.
         
@@ -23,12 +24,12 @@ class Image(Data):
          - ext: image format (png by default)
         """
         super().__init__(data)
-        self.sensor_names = sensor_names
+        self.sensor_name = sensor_name
         self.ext = ext
     
     def save(self, path):
         """
-        Saves images in different folders under the path root folder. Returns a dictionary of save paths.
+        Saves image in different folder under the path root folder. Returns a dictionary of save paths.
        
         Params:
          - path: Root folder to save images
@@ -36,12 +37,9 @@ class Image(Data):
         Returns:
          - save_paths: Dictionary of paths where the images are saved
         """
-        save_paths = {}
-        for i in range(len(self.data)):
-            sensor_name = self.sensor_names[i]
-            data = self.data[i] 
-            (path / Path(sensor_name)).mkdir(exist_ok=True)
-            save_path = (path / Path(sensor_name) / f"{self.frame_id:05d}.{self.ext}").resolve()
-            Image.save(data, save_path)
-            save_paths[sensor_name] = save_path
-        return save_paths
+        (path / Path(self.sensor_name)).mkdir(exist_ok=True)
+        save_path = str((path / Path(self.sensor_name) / f"{self.frame_id:05d}.{self.ext}").resolve())
+
+        cv2.imwrite(save_path, self.data)
+        # return the local path for saving to csv file
+        return str((Path(self.sensor_name) / f"{self.frame_id:05d}.{self.ext}").resolve())

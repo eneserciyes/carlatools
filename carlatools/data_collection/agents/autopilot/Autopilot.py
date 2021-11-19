@@ -1,9 +1,9 @@
 import numpy as np
 import os
 
-from carla import Location, VehicleControl
+from carla import Color, Location, VehicleControl
 import carla.libcarla
-from carlatools.data_collection.agents.autopilot.RoutePlanner import RoutePlanner
+from .RoutePlanner import RoutePlanner
 
 try:
     DEBUG = int(os.environ["DEBUG"]) == 1
@@ -51,20 +51,33 @@ class Autopilot:
         self.steer_controller = steer_controller
         self.speed_controller = speed_controller  
         self.waypoint_planner = RoutePlanner(4.0, 50)
-        self.command_planner = RoutePlanner(7.5, 25.0, 257)   
+        self.command_planner = RoutePlanner(7.5, 25.0, 257)
+        self._traffic_lights = list()
+        self.waypoint_idx = 1 # starting from 1 to be able to interpolate to prev_waypoint
+
+    def init(self, vehicle):
+        """
+        Initialize when the agent's run_step is first called
+        """
+        self.vehicle = vehicle
+        self.world = vehicle.get_world()
+        self.open_drive_map = self.world.get_map()
 
     def set_global_plan(self,global_plan_gps, global_plan):
         self.waypoint_planner.set_route(global_plan_gps, True)
         self.command_planner.set_route(global_plan, True)
+        self._global_plan = global_plan
 
     def run_step(self, input_gps, input_compass, input_speed):
         """
         Gets the input gps, compass and speed data. Using CARLA Autopilot functions, 
         returns a control output, highlevel command and target speed.  
         """
+        self._traffic_lights = self.get_nearby_lights(self.vehicle, self.world.get_actors().filter("*traffic_light*"))
+        self.update_plan(input_gps, input_speed)
         gps = self._get_position(input_gps)
-        near_node, highlevel_command = self._waypoint_planner.run_step(gps)
-        far_node, _ = self._command_planner.run_step(gps)
+        near_node, highlevel_command = self.waypoint_planner.run_step(gps)
+        far_node, _ = self.command_planner.run_step(gps)
 
         steer, throttle, brake, target_speed = self._get_control(
             near_node, far_node, gps, input_compass, input_speed)
@@ -76,15 +89,87 @@ class Autopilot:
 
         return control, highlevel_command, target_speed
     
+    def get_nearby_lights(self, vehicle, lights, pixels_per_meter=5.5, size=512, radius=5):
+        """
+        Return the list of nearby traffic lights.
+        Taken from carla_project by Brady Zhou: 
+        https://github.com/bradyz/carla_project/blob/ac791fcf7e59ad80b6908dadc00eb4f26147c065/src/carla_env.py
+        """
+        result = list()
+        transform = vehicle.get_transform()
+        pos = transform.location
+        theta = np.radians(90 + transform.rotation.yaw)
+        R = np.array([
+            [np.cos(theta), -np.sin(theta)],
+            [np.sin(theta),  np.cos(theta)],
+            ])
+
+        for light in lights:
+            delta = light.get_transform().location - pos
+
+            target = R.T.dot([delta.x, delta.y])
+            target *= pixels_per_meter
+            target += size // 2
+
+            if min(target) < 0 or max(target) >= size:
+                continue
+
+            trigger = light.trigger_volume
+            light.get_transform().transform(trigger.location)
+            dist = trigger.location.distance(vehicle.get_location())
+            a = np.sqrt(
+                    trigger.extent.x ** 2 +
+                    trigger.extent.y ** 2 +
+                    trigger.extent.z ** 2)
+            b = np.sqrt(
+                    vehicle.bounding_box.extent.x ** 2 +
+                    vehicle.bounding_box.extent.y ** 2 +
+                    vehicle.bounding_box.extent.z ** 2)
+
+            if dist > a + b:
+                continue
+
+            result.append(light)
+
+        return result
+    
+    def _get_angle_to(self, pos, theta, target):
+        R = np.array([
+            [np.cos(theta), -np.sin(theta)],
+            [np.sin(theta), np.cos(theta)],
+        ])
+
+        aim = R.T.dot(target - pos)
+        angle = -np.degrees(np.arctan2(-aim[1], aim[0]))
+        angle = 0.0 if np.isnan(angle) else angle
+
+        return angle
+
+    def update_plan(self, gps, speed):
+        lookahead_distance = 0.5e-5 + (4.5e-5 * (speed/7.1))
+
+        current_dist = np.linalg.norm(np.array([
+                self._global_plan[self.waypoint_idx][0]["lat"] - gps[0],
+                self._global_plan[self.waypoint_idx][0]["lon"] - gps[1]]))
+        lookahead_idx = self.waypoint_idx
+        for i in range(self.waypoint_idx + 1, len(self._global_plan)):
+            if current_dist >= lookahead_distance:
+                break
+            current_dist += np.linalg.norm(np.array([
+                self._global_plan[i][0]["lat"] - self._global_plan[i-1][0]["lat"],
+                self._global_plan[i][0]["lon"] - self._global_plan[i-1][0]["lon"]]))
+            lookahead_idx = i
+        self.waypoint_idx = lookahead_idx
+    
     def _get_position(self, gps):
-        return (gps - self._command_planner.mean) * self._command_planner.scale
+        return (gps - self.command_planner.mean) * self.command_planner.scale
     
     def _get_control(self, target, far_target, pos, theta, speed):
             # Steering.
             angle_unnorm = self._get_angle_to(pos, theta, target)
             angle = angle_unnorm / 90
 
-            steer = self._turn_controller.step(angle)
+            steer = self.steer_controller.step(angle)
             steer = np.clip(steer, -1.0, 1.0)
             steer = round(steer, 3)
 
@@ -97,7 +182,7 @@ class Autopilot:
             target_speed = target_speed if not brake else 0.0
 
             delta = np.clip(target_speed - speed, 0.0, 0.25)
-            throttle = self._speed_controller.step(delta)
+            throttle = self.speed_controller.step(delta)
             throttle = np.clip(throttle, 0.0, 0.75)
 
             if brake:
@@ -107,7 +192,7 @@ class Autopilot:
             return steer, throttle, brake, target_speed
 
     def _should_brake(self):
-        actors = self._world.get_actors()
+        actors = self.world.get_actors()
 
         vehicle = self._is_vehicle_hazard(actors.filter("*vehicle*"))
         light = self._is_light_red(actors.filter("*traffic_light*"))
@@ -123,11 +208,11 @@ class Autopilot:
         p2 = _location(p[0] + v[0], p[1] + v[1], z)
         color = Color(*color)
 
-        self._world.debug.draw_line(p1, p2, 0.25, color, 0.01)
+        self.world.debug.draw_line(p1, p2, 0.25, color, 0.01)
 
     def _is_light_red(self, lights_list):
-        if self._vehicle.get_traffic_light_state() != carla.libcarla.TrafficLightState.Green:
-            affecting = self._vehicle.get_traffic_light()
+        if self.vehicle.get_traffic_light_state() != carla.libcarla.TrafficLightState.Green:
+            affecting = self.vehicle.get_traffic_light()
 
             for light in self._traffic_lights:
                 if light.id == affecting.id:
@@ -136,9 +221,9 @@ class Autopilot:
         return None
 
     def _is_walker_hazard(self, walkers_list):
-        z = self._vehicle.get_location().z
-        p1 = _numpy(self._vehicle.get_location())
-        v1 = 10.0 * _orientation(self._vehicle.get_transform().rotation.yaw)
+        z = self.vehicle.get_location().z
+        p1 = _numpy(self.vehicle.get_location())
+        v1 = 10.0 * _orientation(self.vehicle.get_transform().rotation.yaw)
 
         self._draw_line(p1, v1, z + 2.5, (0, 0, 255))
 
@@ -162,18 +247,18 @@ class Autopilot:
         return None
 
     def _is_vehicle_hazard(self, vehicle_list):
-        z = self._vehicle.get_location().z
+        z = self.vehicle.get_location().z
 
-        o1 = _orientation(self._vehicle.get_transform().rotation.yaw)
-        p1 = _numpy(self._vehicle.get_location())
-        s1 = max(7.5, 2.0 * np.linalg.norm(_numpy(self._vehicle.get_velocity())))
+        o1 = _orientation(self.vehicle.get_transform().rotation.yaw)
+        p1 = _numpy(self.vehicle.get_location())
+        s1 = max(7.5, 2.0 * np.linalg.norm(_numpy(self.vehicle.get_velocity())))
         v1_hat = o1
         v1 = s1 * v1_hat
 
         self._draw_line(p1, v1, z + 2.5, (255, 0, 0))
 
         for target_vehicle in vehicle_list:
-            if target_vehicle.id == self._vehicle.id:
+            if target_vehicle.id == self.vehicle.id:
                 continue
 
             o2 = _orientation(target_vehicle.get_transform().rotation.yaw)

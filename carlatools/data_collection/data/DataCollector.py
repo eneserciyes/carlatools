@@ -1,7 +1,5 @@
-from typing import Dict
 import warnings
-from carlatools.data_collection.data.Episode import Episode
-
+from .Episode import Episode
 
 class DataCollector:
     """
@@ -26,17 +24,19 @@ class DataCollector:
         """
         Return the list of required sensors from extractors.
         """
-        return filter(lambda x: x is not None, [extractor.required_sensors for extractor in self.extractors])
+        return [item for sublist in \
+            list(filter(lambda x: x is not None, [extractor.required_sensors for extractor in self.extractors])) \
+            for item in sublist]
 
-    def required_sensors(self, sensors_json):
-        """
-        Read required sensors from a json file.
-        Params:
-         - sensors_json: path to the sensor json file
-        """
-        import json
-        with open(sensors_json, 'r') as sensor_file:
-            return json.load(sensor_file)
+    # def required_sensors(self, sensors_json):
+    #     """
+    #     Read required sensors from a json file.
+    #     Params:
+    #      - sensors_json: path to the sensor json file
+    #     """
+    #     import json
+    #     with open(sensors_json, 'r') as sensor_file:
+    #         return json.load(sensor_file)
 
     def start_episode(self, episode_name=None, save_dir=None):
         """
@@ -61,7 +61,7 @@ class DataCollector:
         """
         Closes the active sequence and writes the collected data to disk. 
         """
-        if self.active_episode.is_closed() or self.active_episode is None:
+        if not self.active_episode.is_open() or self.active_episode is None:
             warnings.warn("There is no active sequence, doing nothing.")
 
         self.active_episode.save_to_disk()
@@ -89,7 +89,7 @@ class DataCollector:
 
         for extractor in self.extractors:
             extracted_data = extractor.extract(input_data)
-            if type(extracted_data) is Dict:
+            if type(extracted_data) is dict:
                 data_dict.update(extracted_data)
             else:
                 data_dict[extractor.name] = extracted_data

@@ -9,7 +9,7 @@ def get_entry_point():
 class AutoDataSaverAgent(AutoDataAgent):
     def setup(self, path_to_conf_file):
         super().setup(path_to_conf_file)
-        self.data_collector.add_extractor(RGBExtractor('rgbs', [
+        self.data_collector.add_extractor(RGBExtractor('rgbs',
             {
                 "type": "sensor.camera.rgb",
                 "x": 1.3,
@@ -23,9 +23,9 @@ class AutoDataSaverAgent(AutoDataAgent):
                 "fov": 90,
                 "id": "rgb"
             }
-        ]))
+        ))
         self.data_collector.start_episode(
-            'example_rgb_save', self.configs["save_dir"])
+            'example_rgb_save', self.configs["save_root"])
 
     def destroy(self):
         self.data_collector.end_episode()
