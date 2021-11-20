@@ -22,15 +22,15 @@ class AutoDataAgent(autonomous_agent.AutonomousAgent):
         self.data_collector = DataCollector(save_dir=self.configs["save_root"])
         self.autopilot = Autopilot(PIDController(
             K_P=1.25, K_I=0.75, K_D=0.3, n=40), PIDController(K_P=5.0, K_I=0.5, K_D=1.0, n=40))
-        print("Parent setup is called")
 
     def init(self):
         self.vehicle = CarlaDataProvider.get_hero_actor()
-        self.autopilot.init(self.vehicle)
+        self.world = self.vehicle.get_world()
+        self.map = self.world.get_map()
+        
+        self.autopilot.init(self.vehicle, self.world, self.map)
 
     def sensors(self):
-        print("Parent sensors is called.")
-        print(self.data_collector.required_sensors())
         autopilot_sensors = [
             {
                 "type": "sensor.other.imu",

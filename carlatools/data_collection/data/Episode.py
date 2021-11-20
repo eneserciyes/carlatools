@@ -27,7 +27,3 @@ class Episode:
         df = pd.DataFrame(save_data)
         with open(str((Path(self.save_dir) / Path(self.name) / Path(self.name + ".csv")).resolve()), 'w') as csvfile:
             df.to_csv(csvfile)
-
-    def visualize(self):
-        #TODO: implement a visualizer that shows all data in the episode beautifully
-        pass

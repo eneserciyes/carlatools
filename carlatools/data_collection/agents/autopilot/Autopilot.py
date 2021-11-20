@@ -55,13 +55,13 @@ class Autopilot:
         self._traffic_lights = list()
         self.waypoint_idx = 1 # starting from 1 to be able to interpolate to prev_waypoint
 
-    def init(self, vehicle):
+    def init(self, vehicle, world, map):
         """
         Initialize when the agent's run_step is first called
         """
         self.vehicle = vehicle
-        self.world = vehicle.get_world()
-        self.open_drive_map = self.world.get_map()
+        self.world = world
+        self.open_drive_map = map
 
     def set_global_plan(self,global_plan_gps, global_plan):
         self.waypoint_planner.set_route(global_plan_gps, True)

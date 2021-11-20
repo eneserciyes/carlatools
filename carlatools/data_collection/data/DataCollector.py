@@ -100,3 +100,7 @@ class DataCollector:
             self.active_episode.add_data(data_dict)
 
         return data_dict
+
+    def visualize(self, data_dict):
+        pass
+
