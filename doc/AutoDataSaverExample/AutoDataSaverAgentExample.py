@@ -2,10 +2,8 @@ from carlatools.data_collection.agents.DataAgent import AutoDataAgent
 from carlatools.data_collection.extractors.Extractors import RGBExtractor
 from carlatools.data_collection.extractors.AffordanceExtractors import TrafficLightExtractor
 
-
 def get_entry_point():
     return "AutoDataSaverAgent"
-
 
 class AutoDataSaverAgent(AutoDataAgent):
     def setup(self, path_to_conf_file):
