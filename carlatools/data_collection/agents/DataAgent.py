@@ -66,7 +66,6 @@ class AutoDataAgent(autonomous_agent.AutonomousAgent):
         if not self.initialized:
             self.init()
             self.initialized = True
-        print(self.autopilot.vehicle)
         control, highlevel_command, target_speed = self.autopilot.run_step(
             input_data["gps"][1][:2], input_data['imu'][1][-1], input_data['speed'][1]["speed"])
         input_data["highlevel_command"] = highlevel_command
