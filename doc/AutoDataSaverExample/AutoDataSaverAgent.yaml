@@ -1,1 +1,2 @@
-save_root: "/home/fguney/data/CARLA_leaderboard/data_test"
+save_root: "/data/CARLA_leaderboard/test_data"
+dynamic_weather: True

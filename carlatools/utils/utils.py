@@ -2,11 +2,11 @@ import numpy as np
 import math
 import carla
 
-import gnss
+from .gnss import geodetic_to_ecef, ecef_to_enu
 
 def gnss_to_carla_coord(lat, lon, alt):
-    x, y, z = gnss.geodetic_to_ecef(lat, lon, alt)
-    carla_x, carla_y, carla_z = gnss.ecef_to_enu(x, y, z, 0.0, 0.0, 0.0)
+    x, y, z = geodetic_to_ecef(lat, lon, alt)
+    carla_x, carla_y, carla_z = ecef_to_enu(x, y, z, 0.0, 0.0, 0.0)
     return carla_x, -carla_y, carla_z
 
 

@@ -10,7 +10,7 @@ class DataExtractor(ABC):
         self.required_sensors = required_sensors
     
     @abstractmethod
-    def extract(self):
+    def extract(self, input_data):
         """
         Returns the data to be used. If a dictionary is returned, data collector does not keep
         a nested dictionary but merges it with others.

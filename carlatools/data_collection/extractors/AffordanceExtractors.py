@@ -15,7 +15,7 @@ class TrafficLightExtractor(DataExtractor):
         self.world = world
         self.opendrive_map = map
 
-    def extract(self):
+    def extract(self, input_data):
         # 0 for no light, 1 for light detected
         tl_exists = 0
         # 0 represents green or nonexistent light. 1 represents yellow or red light

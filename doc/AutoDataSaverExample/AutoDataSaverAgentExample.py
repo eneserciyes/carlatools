@@ -28,8 +28,8 @@ class AutoDataSaverAgent(AutoDataAgent):
 
     def init(self):
         super().init()
-        self.data_collector.add_extractor(TrafficLightExtractor(
-            'traffic_light', self.vehicle, self.world, self.map))
+        # self.data_collector.add_extractor(TrafficLightExtractor(
+        #     'traffic_light', self.vehicle, self.world, self.map))
 
     def destroy(self):
         self.data_collector.end_episode()

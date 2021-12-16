@@ -6,6 +6,7 @@ from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from carlatools.data_collection.data.DataCollector import DataCollector
 from .autopilot.Autopilot import Autopilot
 from .autopilot.pid import PIDController
+from .configs.dynamic_weather import Weather
 
 def get_entry_point():
     return "AutoDataAgent"
@@ -18,6 +19,7 @@ class AutoDataAgent(autonomous_agent.AutonomousAgent):
             self.configs = yaml.safe_load(stream)
 
         self.initialized = False
+        self.fps = 20 # default
 
         self.data_collector = DataCollector(save_dir=self.configs["save_root"])
         self.autopilot = Autopilot(PIDController(
@@ -27,7 +29,14 @@ class AutoDataAgent(autonomous_agent.AutonomousAgent):
         self.vehicle = CarlaDataProvider.get_hero_actor()
         self.world = self.vehicle.get_world()
         self.map = self.world.get_map()
-        
+        try:
+            if self.configs["dynamic_weather"]:
+                self.weather = Weather(self.world.get_weather(), 1 / self.fps)
+            else:
+                self.weather = None
+        except KeyError as e:
+            print("Dynamic weather is not set in configurations")
+
         self.autopilot.init(self.vehicle, self.world, self.map)
 
     def sensors(self):
@@ -70,8 +79,10 @@ class AutoDataAgent(autonomous_agent.AutonomousAgent):
             input_data["gps"][1][:2], input_data['imu'][1][-1], input_data['speed'][1]["speed"])
         input_data["highlevel_command"] = highlevel_command
         input_data["target_speed"] = target_speed
-
-        self.data_collector.tick(input_data)
+        
+        if self.weather is not None:
+            self.world.set_weather(self.weather.tick()) # update weather dynamically.
+        self.data_collector.tick(input_data)    
         return control
 
     def set_global_plan(self, global_plan_gps, global_plan_world_coord):
