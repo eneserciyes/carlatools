@@ -1,5 +1,7 @@
 import yaml
 
+from carla import VehicleLightState
+
 from leaderboard.autoagents import autonomous_agent
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 
@@ -20,6 +22,7 @@ class AutoDataAgent(autonomous_agent.AutonomousAgent):
 
         self.initialized = False
         self.fps = 20 # default
+        self.light_state = VehicleLightState.Position
 
         self.data_collector = DataCollector(save_dir=self.configs["save_root"])
         self.autopilot = Autopilot(PIDController(
@@ -71,6 +74,31 @@ class AutoDataAgent(autonomous_agent.AutonomousAgent):
 
         return self.data_collector.required_sensors() + autopilot_sensors
 
+    def update_lights(self):
+        light_state = VehicleLightState.Position
+        # Turn on vehicle lights if we it is night
+        if self.weather.weather.sun_altitude_angle < 0:
+            print("Night")
+            light_state |= VehicleLightState.LowBeam
+        else:
+            print("Morning")
+            #light_state &= ~VehicleLightState.LowBeam
+        # Turn on fog lights
+        if self.weather.weather.fog_density > 20:
+            print("Foggy")
+            light_state |= VehicleLightState.Fog
+        else:
+            print("Not foggy")
+            #light_state &= ~VehicleLightState.Fog
+        # Modify vehicle light state if a change is necessary
+        if light_state != self.light_state:
+            for vehicle in self.world.get_actors().filter("*vehicle*"):
+                print("Changed all vehicle states")
+                vehicle.set_light_state(VehicleLightState(light_state))
+            self.vehicle.set_light_state(VehicleLightState(light_state))
+            print("Changed ego vehicle state")
+            self.light_state = light_state
+
     def run_step(self, input_data, timestamp):
         if not self.initialized:
             self.init()
@@ -82,6 +110,7 @@ class AutoDataAgent(autonomous_agent.AutonomousAgent):
         
         if self.weather is not None:
             self.world.set_weather(self.weather.tick()) # update weather dynamically.
+            self.update_lights()
         self.data_collector.tick(input_data)    
         return control
 
