@@ -1,2 +1,2 @@
 save_root: "/data/CARLA_leaderboard/test_data"
-dynamic_weather: True
+dynamic_weather: False
