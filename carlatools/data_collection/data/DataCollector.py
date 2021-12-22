@@ -7,12 +7,15 @@ class DataCollector:
     truth information.
     """
 
-    def __init__(self, *args, save_dir):
+    def __init__(self, *args, save_dir, fps_divisor=1):
         self.save_dir = save_dir
         self.extractors = args
         self.episodes = []
         self.episode_count = 0
         self.active_episode = None
+
+        self.fps_divisor = fps_divisor
+        self.tick_counter = 0
 
     def add_extractor(self, *extractors):
         self.extractors += extractors
@@ -85,21 +88,25 @@ class DataCollector:
         Returns:
          - data_dict: a dictionary of data with keys as ids of data extractors.
         """
-        data_dict = {}
+        self.tick_counter+=1
+        if self.tick_counter % self.fps_divisor == 0:
+            self.tick_counter = 0
 
-        for extractor in self.extractors:
-            extracted_data = extractor.extract(input_data)
-            if type(extracted_data) is dict:
-                data_dict.update(extracted_data)
-            else:
-                data_dict[extractor.name] = extracted_data
+            data_dict = {}
 
-        if self.active_episode is not None \
-                and self.active_episode.is_open():
-            # if there is an active episode, add data to episode.
-            self.active_episode.add_data(data_dict)
+            for extractor in self.extractors:
+                extracted_data = extractor.extract(input_data)
+                if type(extracted_data) is dict:
+                    data_dict.update(extracted_data)
+                else:
+                    data_dict[extractor.name] = extracted_data
 
-        return data_dict
+            if self.active_episode is not None \
+                    and self.active_episode.is_open():
+                # if there is an active episode, add data to episode.
+                self.active_episode.add_data(data_dict)
+
+            return data_dict
 
     def visualize(self, data_dict):
         pass

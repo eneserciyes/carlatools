@@ -76,27 +76,17 @@ class AutoDataAgent(autonomous_agent.AutonomousAgent):
 
     def update_lights(self):
         light_state = VehicleLightState.Position
-        # Turn on vehicle lights if we it is night
+        # Turn on vehicle lights if we it is night, no need for else as we set light_state each time at the beginning
         if self.weather.weather.sun_altitude_angle < 0:
-            print("Night")
             light_state |= VehicleLightState.LowBeam
-        else:
-            print("Morning")
-            #light_state &= ~VehicleLightState.LowBeam
         # Turn on fog lights
         if self.weather.weather.fog_density > 20:
-            print("Foggy")
             light_state |= VehicleLightState.Fog
-        else:
-            print("Not foggy")
-            #light_state &= ~VehicleLightState.Fog
         # Modify vehicle light state if a change is necessary
         if light_state != self.light_state:
             for vehicle in self.world.get_actors().filter("*vehicle*"):
-                print("Changed all vehicle states")
                 vehicle.set_light_state(VehicleLightState(light_state))
             self.vehicle.set_light_state(VehicleLightState(light_state))
-            print("Changed ego vehicle state")
             self.light_state = light_state
 
     def run_step(self, input_data, timestamp):
